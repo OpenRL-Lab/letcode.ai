@@ -20,28 +20,49 @@ async function solve(url) {
 
   log(chalk.blue('Page loaded:', url));
   // Get the content inside the div
-  const element = await page.$x('/html[1]/body[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[3]/div[2]');
+//   const element = await page.$x('/html[1]/body[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[3]/div[2]');
+  const element = await page.$x('html/body/div[1]/div[2]/div/div/div[2]/div/div/div[4]/div/div[1]/div[3]');
   // console.log(element)
   const text = await page.evaluate(el => el.textContent, element[0]);
-  log(chalk.blue('Question detected'));
+  log(chalk.blue('Question detected: ' + text));
   // Get the content inside the div: /html[1]/body[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[4]
-  const element2 = await page.$x('/html[1]/body[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[4]');
+//   const element2 = await page.$x('/html[1]/body[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[4]');
+  const element2 = await page.$x('/html/body/div[1]/div[2]/div/div/div[2]/div/div/div[8]/div/div[2]/div[1]/div/div/div[1]/div[2]/div[1]/div[4]');
   const text2 = await page.evaluate(el => el.textContent, element2[0]);
-  log(chalk.blue('Code template detected'));
-  log(chalk.blue('Asking GPT-4...'));
+  log(chalk.blue('Code template detected:'+ text2));
 
-  const btn = await page.$x("//button[contains(text(),'Submit')]")
 
+//   const btn = await page.$x("//button[contains(text(),'Submit')]")
+//   const btn = await page.$('[data-e2e-locator="console-submit-button"]')
+
+
+  const btn = await page.$x('//*[@data-e2e-locator="console-submit-button"]');
+    if (btn.length == 0) {
+        console.log('Button not found');
+        return
+    }
+
+  log(chalk.red('Asking LLM...'));
+
+   const base_url = 'http://172.26.1.16:31251/v1'
+//   const api_key = 'sk-'
+// const model_name = "modelscope/qwen/Qwen-14B-Chat"
+
+  const api_key = 'OpenRL-ashgfwdadfyafgafsfnthabq'
+  const model_name = "OpenRL/azure/gpt4-1106-preview"
+
+
+  const language = "python"
   const data = {
-    "model": "gpt-4-1106-preview",
+    "model": model_name,
     "messages": [
       {
         "role": "user",
         "content": `${text}
 
-Complete the following js function for me
+Complete the following ${language} function for me
 
-\`\`\`js
+\`\`\`${language}
 ${text2}
 \`\`\`
         `
@@ -49,10 +70,12 @@ ${text2}
     ]
   };
 
-  const res = await fetch('https://api.openai-proxy.com/v1/chat/completions', {
+
+
+  const res = await fetch(`${base_url}/chat/completions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Authorization': `Bearer ${api_key}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(data)
@@ -61,14 +84,20 @@ ${text2}
   const resJSON = await res.json();
   // console.log(resJSON)
   const content = resJSON.choices[0].message.content;
-  log(chalk.blue('GPT-4 responded'));
+  log(chalk.blue('Model responded'));
+  log(chalk.red("Response:"+content));
 
   log(chalk.blue('Filling in the code...'));
 
   // find the js code inside content
-  const start = content.indexOf('```js');
+  const start = content.indexOf(`\`\`\`${language}`);
   const end = content.indexOf('```', start + 1);
-  const code = content.substring(start + 5, end);
+  const code = content.substring(start + 3+ language.length, end);
+
+  log("start:",start)
+  log("end:",end)
+  log("Code:",code)
+//   exit(0)
   // remove indents from code
   const codeWithoutIndent = code.split('\n').map(line => line.trim()).join('\n');
 
